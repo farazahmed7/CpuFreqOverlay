@@ -47,9 +47,6 @@ public class StatusService extends Service {
     public int onStartCommand(Intent intent, int flags, int startId)
     {
         flag=intent.getBooleanExtra(status, true);
-
-        Service context=this;
-
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
 
         statusText=new TextView(this);
@@ -130,11 +127,10 @@ public class StatusService extends Service {
         parentLayout.addView(statusText3, params_statusText3);
         parentLayout.addView(statusText4, params_statusText4);
         windowManager.updateViewLayout(parentLayout, params);
-        statusText2.setText("heollooooo");
 
         HandlerThread thread = new HandlerThread("MyHandlerThread");
         thread.start();
-      final   Handler handler=new Handler(thread.getLooper());
+      handler=new Handler(thread.getLooper());
 
 
 
