@@ -8,14 +8,101 @@
     tools:context=".HomeActivity">
 
 
-  <Button
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:text="toggle service"
-      android:id="@+id/stop"/>
+<TextView
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:id="@+id/textView1"/>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:id="@+id/freq"/>
+        android:id="@+id/textView2"/>
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/textView3"/>
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/textView4"/>
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Hide Overlay"
+        android:id="@+id/start"/>
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        android:id="@+id/graphAct"/>
+
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:orientation="horizontal"
+        android:layout_height="wrap_content">
+
+
+    <com.jjoe64.graphview.GraphView
+
+
+        android:layout_width="0dp"
+        android:layout_height="200dp"
+        android:id="@+id/graph1"
+        android:layout_weight="1"
+        />
+        <View
+            android:layout_width="2dp"
+            android:layout_height="match_parent"
+            android:background="@color/colorPrimaryDark"
+            ></View>
+
+    <com.jjoe64.graphview.GraphView
+
+        android:layout_width="0dp"
+        android:layout_height="200dp"
+
+        android:layout_weight="1"
+        android:id="@+id/g2"
+        />
+
+    </LinearLayout>
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="2dp"
+        android:background="@color/colorPrimaryDark"
+        ></View>
+
+
+    <LinearLayout
+        android:layout_width="wrap_content"
+        android:orientation="horizontal"
+        android:layout_height="wrap_content">
+
+
+        <com.jjoe64.graphview.GraphView
+
+
+            android:layout_width="0dp"
+            android:layout_height="200dp"
+            android:id="@+id/graph3"
+            android:layout_weight="1"
+            />
+        <View
+            android:layout_width="2dp"
+            android:layout_height="match_parent"
+            android:background="@color/colorPrimaryDark"
+            ></View>
+
+
+        <com.jjoe64.graphview.GraphView
+
+            android:layout_width="0dp"
+            android:layout_height="200dp"
+            android:layout_weight="1"
+            android:id="@+id/graph4"
+            />
+
+    </LinearLayout>
 </LinearLayout>
