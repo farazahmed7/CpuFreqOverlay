@@ -5,6 +5,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.PixelFormat;
 import android.graphics.Typeface;
+import android.os.AsyncTask;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.os.IBinder;
@@ -25,17 +26,19 @@ import android.widget.Toast;
 import org.w3c.dom.Text;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.RandomAccessFile;
 
 /**
- * Created by abc on 7/3/2016.
+ * Created by abc on 7/3/1816.
  */
 public class StatusService extends Service {
-
+    final static String MY_ACTION = "MY_ACTION";
     private TextView statusText;
     private TextView statusText2;
     private TextView statusText3;
     private TextView statusText4;
+    private TextView cpuTemp;
     WindowManager windowManager;
     private RelativeLayout parentLayout;
     Handler handler;
@@ -46,34 +49,40 @@ public class StatusService extends Service {
     @Override
     public int onStartCommand(Intent intent, int flags, int startId)
     {
-        flag=intent.getBooleanExtra(status, true);
+
         windowManager = (WindowManager) getSystemService(WINDOW_SERVICE);
 
         statusText=new TextView(this);
         statusText2=new TextView(this);
         statusText3=new TextView(this);
         statusText4=new TextView(this);
+        cpuTemp=new TextView(this);
         parentLayout = new RelativeLayout(this);
 
         statusText.setTypeface(null, Typeface.BOLD_ITALIC);
-        statusText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
+        statusText.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
         statusText.setTextColor(getResources().getColor(R.color.black));
         statusText.setId(R.id.cpu1);
         statusText2.setTypeface(null, Typeface.BOLD_ITALIC);
-        statusText2.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
+        statusText2.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
         statusText2.setTextColor(getResources().getColor(R.color.black));
         statusText2.setId(R.id.cpu2);
         statusText3.setTypeface(null, Typeface.BOLD_ITALIC);
-        statusText3.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
+        statusText3.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
         statusText3.setTextColor(getResources().getColor(R.color.black));
         statusText3.setId(R.id.cpu3);
         statusText4.setTypeface(null, Typeface.BOLD_ITALIC);
         statusText4.setTextColor(getResources().getColor(R.color.black));
-        statusText4.setTextSize(TypedValue.COMPLEX_UNIT_SP, 20);
+        statusText4.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
+        cpuTemp.setTypeface(null, Typeface.BOLD_ITALIC);
+        cpuTemp.setTextColor(getResources().getColor(R.color.black));
+        cpuTemp.setTextSize(TypedValue.COMPLEX_UNIT_SP, 18);
 
         RelativeLayout.LayoutParams rlp = new RelativeLayout.LayoutParams(
                 RelativeLayout.LayoutParams.WRAP_CONTENT,
-                RelativeLayout.LayoutParams.WRAP_CONTENT);
+                RelativeLayout.LayoutParams.WRAP_CONTENT
+        );
+
 
         parentLayout.setLayoutParams(rlp);
 
@@ -109,6 +118,12 @@ public class StatusService extends Service {
         params_statusText4.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
         params_statusText4.addRule(RelativeLayout.BELOW,statusText3.getId());
 
+        final RelativeLayout.LayoutParams params_cpuTemp=new RelativeLayout.LayoutParams(
+                WindowManager.LayoutParams.WRAP_CONTENT,
+                WindowManager.LayoutParams.WRAP_CONTENT
+        );
+        params_cpuTemp.addRule(RelativeLayout.ABOVE,statusText.getId());
+
 
 
 
@@ -126,62 +141,20 @@ public class StatusService extends Service {
         parentLayout.addView(statusText2, params_statusText2);
         parentLayout.addView(statusText3, params_statusText3);
         parentLayout.addView(statusText4, params_statusText4);
+        parentLayout.addView(cpuTemp,params_cpuTemp);
+
         windowManager.updateViewLayout(parentLayout, params);
 
-        HandlerThread thread = new HandlerThread("MyHandlerThread");
-        thread.start();
-      handler=new Handler(thread.getLooper());
+      handler=new Handler();
 
 
 
         r = new Runnable() {
             public void run() {
 
-                    String cpuCore0 = "";
-                String cpuCore1 = "";
-                String cpuCore2 = "";
-                String cpuCore3 = "";
-
-
-                    try {
-                        RandomAccessFile reader = new RandomAccessFile("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq", "r");
-                        cpuCore0 = reader.readLine();
-                         RandomAccessFile reader2= new RandomAccessFile("/sys/devices/system/cpu/cpu1/cpufreq/scaling_cur_freq", "r");
-                         cpuCore1=reader2.readLine();
-                         RandomAccessFile reader3=new RandomAccessFile("/sys/devices/system/cpu/cpu2/cpufreq/scaling_cur_freq", "r");
-                          cpuCore2=reader3.readLine();
-                        RandomAccessFile reader4=new RandomAccessFile("/sys/devices/system/cpu/cpu3/cpufreq/scaling_cur_freq", "r");
-                         cpuCore3=reader4.readLine();
-
-                        reader.close();
-                         reader2.close();
-                         reader3.close();
-                         reader4.close();
-                    } catch (IOException e) {
-
-                    }
-                Handler h=new Handler(Looper.getMainLooper());
-                final String finalCpuCore0 = cpuCore0;
-                final String finalCpuCore1 = cpuCore1;
-                final String finalCpuCore2 = cpuCore2;
-                final String finalCpuCore3 = cpuCore3;
-                Runnable r0=new Runnable() {
-                    @Override
-                    public void run() {
-                        statusText.setText("cpu0: "+ finalCpuCore0);
-                        statusText2.setText("cpu1: "+ finalCpuCore1);
-                        statusText3.setText("cpu2: "+finalCpuCore2);
-                        statusText4.setText("cpu3: "+finalCpuCore3);
-
-
-
-                    }
-                };
-                h.post(r0);
-
-
+                CPUFrequency frequency = new CPUFrequency();
+                frequency.execute();
                 handler.postDelayed(this, 1000);
-
 
             }
         };
@@ -210,7 +183,7 @@ public class StatusService extends Service {
                     case MotionEvent.ACTION_UP:
                         return true;
                     case MotionEvent.ACTION_MOVE:
-                        params.x = initialX + (int) (event.getRawX() - initialTouchX);
+                        params.x = initialX - (int) (event.getRawX() - initialTouchX);
                         params.y = initialY + (int) (event.getRawY() - initialTouchY);
                         windowManager.updateViewLayout(parentLayout, params);
                         return true;
@@ -244,6 +217,66 @@ public class StatusService extends Service {
      super.onDestroy();
         handler.removeCallbacksAndMessages(null);
         windowManager.removeView(parentLayout);
+
+
+    }
+
+    class CPUFrequency extends AsyncTask<Void, Void, Void> {
+        private String[] args;
+        private ProcessBuilder cmd;
+        private InputStream in;
+        private Process process;
+        private byte[] re;
+        private String result="";
+        String arr[]=new String[6];
+
+
+
+        @Override
+        protected Void doInBackground(Void... params) {
+
+            for(int i=0;i<4;++i) {
+                this.args = new String[]{"/system/bin/cat", "/sys/devices/system/cpu/cpu" + i + "/cpufreq/scaling_cur_freq"};
+                result="";
+                try {
+                    cmd = new ProcessBuilder(this.args);
+                    process = this.cmd.start();
+                    in = this.process.getInputStream();
+                    re = new byte[1024];
+                    while (in.read(re) != -1) {
+                        this.result += new String(this.re);
+                    }
+                    arr[i]=result;
+
+
+                } catch (IOException e) {
+
+
+                }
+            }
+
+            return null;
+
+        }
+        @Override
+        protected void onPostExecute(Void result) {
+
+            statusText.setText("cpu0 "+arr[0]);
+            statusText2.setText("cpu1 "+arr[1]);
+            statusText3.setText("cpu2 "+arr[2]);
+            statusText4.setText("cpu3 "+arr[3]);
+
+            Intent intent = new Intent();
+            intent.setAction(MY_ACTION);
+
+            intent.putExtra("DATAPASSED", arr);
+
+            sendBroadcast(intent);
+
+
+        }
+
+
 
 
     }
