@@ -24,6 +24,8 @@ import com.jjoe64.graphview.GridLabelRenderer;
 import com.jjoe64.graphview.series.DataPoint;
 import com.jjoe64.graphview.series.LineGraphSeries;
 
+
+
 import org.w3c.dom.Text;
 
 import java.io.File;
@@ -40,16 +42,18 @@ public class HomeActivity extends AppCompatActivity {
     MyReceiver myReceiver;
     private static final String[] cpu_temp_paths = new String[]{"/sys/devices/system/cpu/cpu0/cpufreq/cpu_temp", "/sys/devices/system/cpu/cpu0/cpufreq/FakeShmoo_cpu_temp", "/sys/class/thermal/thermal_zone1/temp", "/sys/class/i2c-adapter/i2c-4/4-004c/temperature", "/sys/devices/platform/tegra-i2c.3/i2c-4/4-004c/temperature", "/sys/devices/platform/omap/omap_temp_sensor.0/temperature", "/sys/devices/platform/tegra_tmon/temp1_input", "/sys/kernel/debug/tegra_thermal/temp_tj", "/sys/devices/platform/s5p-tmu/temperature", "/sys/class/thermal/thermal_zone0/temp", "/sys/devices/virtual/thermal/thermal_zone0/temp", "/sys/class/hwmon/hwmon0/device/temp1_input", "/sys/devices/virtual/thermal/thermal_zone1/temp", "/sys/devices/platform/s5p-tmu/curr_temp", "/sys/htc/cpu_temp", "/sys/devices/platform/tegra-i2c.3/i2c-4/4-004c/ext_temperature", "/sys/devices/platform/tegra-tsensor/tsensor_temperature"};
     private int NUMBER_OF_CORES;
-    TextView tx1,tx2,tx3,tx4;
+    TextView tx1,tx2,tx3,tx4,tx5,tx6;
     Button startServiceButton,graphButton;
     private Runnable mTimer2;
     private double graph1LastXValue = 0d;
-    private LineGraphSeries<DataPoint> mSeries[]=new LineGraphSeries[4];
+    private LineGraphSeries<DataPoint> mSeries[]=new LineGraphSeries[6];
     private double graph1LastXValue2 = 0d;
-    GraphView graphs[]=new GraphView[4];
-
+    GraphView graphs[]=new GraphView[6];
+    float cur_freqs[]=new float[6];
     Timer timer;
     TimerTask timerTask;
+    LinearLayout mLayout;
+
 
 
 
@@ -61,14 +65,24 @@ public class HomeActivity extends AppCompatActivity {
         tx2=(TextView)findViewById(R.id.textView2);
         tx3=(TextView)findViewById(R.id.textView3);
         tx4=(TextView)findViewById(R.id.textView4);
+        tx5=(TextView)findViewById(R.id.textView5);
+        tx6=(TextView)findViewById(R.id.textView6);
+
+
+
         startServiceButton=(Button)findViewById(R.id.start);
         graphButton=(Button)findViewById(R.id.graphAct);
+        mLayout=(LinearLayout)findViewById(R.id.layout);
 
         //graphs refrences
         graphs[0] = (GraphView) findViewById(R.id.graph1);
         graphs[1] = (GraphView) findViewById(R.id.g2);
         graphs[2] = (GraphView) findViewById(R.id.graph3);
         graphs[3] = (GraphView) findViewById(R.id.graph4);
+        graphs[4] = (GraphView) findViewById(R.id.graph5);
+        graphs[5] = (GraphView) findViewById(R.id.graph6);
+
+
 
 
 
@@ -103,56 +117,123 @@ public class HomeActivity extends AppCompatActivity {
             e.printStackTrace();
         }
 
+        //getting number of cores
+        File[] files = new File("/sys/devices/system/cpu/").listFiles(new FileFilter() {
+            public boolean accept(File pathname) {
+                return Pattern.matches("cpu[0-9]+", pathname.getName());
+            }
+        });
 
+        NUMBER_OF_CORES=files.length;
+
+        if(NUMBER_OF_CORES<6)
+            mLayout.setVisibility(View.GONE);
+
+    //setting graph properties
         int i;
-        for(i=0;i<4;++i)
+        for(i=0;i<NUMBER_OF_CORES;++i)
         {
             graphs[i].getGridLabelRenderer().setHorizontalLabelsVisible(false);
             graphs[i].getGridLabelRenderer().setVerticalLabelsVisible(false);
             graphs[i].getGridLabelRenderer().setGridStyle(GridLabelRenderer.GridStyle.HORIZONTAL);
-            graphs[i].getGridLabelRenderer().setGridColor(getColor(R.color.colorPrimary));
+            graphs[i].getGridLabelRenderer().setGridColor(getResources().getColor(R.color.graph));
 
 
             mSeries[i] = new LineGraphSeries<DataPoint>();
             graphs[i].getViewport().setXAxisBoundsManual(true);
             graphs[i].getViewport().setYAxisBoundsManual(true);
 
-            graphs[i].getViewport().setMinX(0);
             graphs[i].getViewport().setMaxX(40);
-            graphs[i].getViewport().setMinY(0);
-            graphs[i].getViewport().setMaxY(Float.parseFloat(maxFreq) / 100);
-            graphs[i].getViewport().setMinY(Float.parseFloat(minFreq) / 100);
+            graphs[i].getViewport().setMaxY(Float.parseFloat(maxFreq) / 1000);
+            graphs[i].getViewport().setMinY(Float.parseFloat(minFreq) / 1000);
             graphs[i].getViewport().setScalable(true);
             mSeries[i].setDrawBackground(true);
-            mSeries[i].setBackgroundColor(getColor(R.color.graph));
+            mSeries[i].setBackgroundColor(getResources().getColor(R.color.graph));
             graphs[i].setTitle("core "+i);
             graphs[i].addSeries(mSeries[i]);
         }
 
+        //handler with its own looper and its different thread
+        final Handler uiHandler= new Handler();
 
+       HandlerThread th=new HandlerThread("faraz");
+        th.start();
 
-        HandlerThread handlerThread=new HandlerThread("f");
-        handlerThread.start();
-        final Handler mHandler=new Handler(handlerThread.getLooper());
+        final Handler mHandler=new Handler(th.getLooper());
+
+        // retrieving the freuencies
      final  Runnable r=new Runnable() {
+
+         float arr[]=new float[6];
+         private String[] args;
+         private ProcessBuilder cmd;
+         private InputStream in;
+         private Process process;
+         private byte[] re;
+         private String result="";
+
            @Override
            public void run() {
-                {
-                   CPUFrequency cpuFrequency = new CPUFrequency();
-                   cpuFrequency.execute();
 
+                {
+
+                    int i;
+                    for( i=0;i<NUMBER_OF_CORES;++i) {
+                        this.args = new String[]{"/system/bin/cat", "/sys/devices/system/cpu/cpu" + i + "/cpufreq/scaling_cur_freq"};
+                        result = "";
+
+                        try {
+                            cmd = new ProcessBuilder(this.args);
+                            process = this.cmd.start();
+                            in = this.process.getInputStream();
+                            re = new byte[1024];
+                            while (in.read(re) != -1) {
+                                this.result += new String(this.re);
+                            }
+                             // saving the reuslt for each core in a global array
+                            cur_freqs[i] =Float.parseFloat(result);
+                            Log.d("core 5",cur_freqs[5]+"");
+
+                            //communicating with UI thread
+                            final int finalI = i;
+                            uiHandler.post(new Runnable() {
+
+                                public void run() {
+                                    graph1LastXValue += 3d;
+                                    //appending the graphs
+                                    mSeries[finalI].appendData(new DataPoint(graph1LastXValue, cur_freqs[finalI] / 1000), true, 10);
+
+
+                                }
+                            });
+
+                           // Log.d("core"+i, result);
+
+
+                        } catch (IOException e) {
+
+
+                        }
+
+
+                    }
                }
            }
 
        };
+
+
         timerTask = new TimerTask() {
             public void run() {
                 mHandler.post(r);
+
+
+
             }
         };
 
         timer=new Timer();
-        timer.schedule(timerTask, 0, 1000);
+        timer.schedule(timerTask, 0, 2000);
 
 
 
@@ -181,23 +262,28 @@ public class HomeActivity extends AppCompatActivity {
 
     }
 
-    class CPUFrequency extends AsyncTask<Void, Void, Void> {
+    // Asynctask removed as  of now
+
+    class CPUFrequency extends AsyncTask<String, Float, Void> {
+
+       ;
+        float arr[]=new float[6];
         private String[] args;
         private ProcessBuilder cmd;
         private InputStream in;
         private Process process;
         private byte[] re;
         private String result="";
-        String arr[]=new String[6];
 
 
 
         @Override
-        protected Void doInBackground(Void... params) {
-
-            for(int i=0;i<4;++i) {
+        protected Void doInBackground(String... params) {
+           int i;
+            for( i=0;i<NUMBER_OF_CORES;++i) {
                 this.args = new String[]{"/system/bin/cat", "/sys/devices/system/cpu/cpu" + i + "/cpufreq/scaling_cur_freq"};
-                   result="";
+                result="";
+                int value = 0;
                 try {
                     cmd = new ProcessBuilder(this.args);
                     process = this.cmd.start();
@@ -206,8 +292,15 @@ public class HomeActivity extends AppCompatActivity {
                     while (in.read(re) != -1) {
                         this.result += new String(this.re);
                     }
-                    arr[i]=result;
 
+                    for (int j = 0; j < this.result.length(); j++) {
+
+
+                            this.result = new String(this.result.substring(0, j));
+
+                    }
+                    Log.d("hello",result);
+cur_freqs[i]=value;
 
                 } catch (IOException e) {
 
@@ -215,35 +308,23 @@ public class HomeActivity extends AppCompatActivity {
                 }
             }
 
+
+            for (int j=0;j<NUMBER_OF_CORES;++j)
+            {
+         publishProgress((float) j);
+            }
+
             return null;
 
         }
        @Override
-       protected void onPostExecute(Void result) {
+       protected void onProgressUpdate(Float... values) {
 
-          tx1.setText("cpu0 "+arr[0]);
-           tx2.setText("cpu1 "+arr[1]);
-           tx3.setText("cpu2 "+arr[2]);
-           tx4.setText("cpu3 " + arr[3]);
 
            graph1LastXValue += 3d;
 
-           mSeries[0].appendData(new DataPoint(graph1LastXValue, Double.parseDouble(arr[0]) / 100), true, 40);
 
-           if(arr[1].length()>0) {
-               mSeries[1].appendData(new DataPoint(graph1LastXValue, Double.parseDouble(arr[1]) / 100), true, 40);
-               graphs[1].getGridLabelRenderer().setHorizontalAxisTitle("");
-           }
-           else
-               graphs[1].getGridLabelRenderer().setHorizontalAxisTitle("Offline");
-
-           if(arr[2].length()>0) {
-               mSeries[2].appendData(new DataPoint(graph1LastXValue, Double.parseDouble(arr[2]) / 100), true, 40);
-           }
-
-           if(arr[3].length()>0) {
-               mSeries[3].appendData(new DataPoint(graph1LastXValue, Double.parseDouble(arr[3]) / 100), true, 40);
-           }
+                   mSeries[values[0].shortValue()].appendData(new DataPoint(graph1LastXValue, cur_freqs[values[0].shortValue()] / 100), true, 40);
 
 
 
@@ -282,6 +363,8 @@ public class HomeActivity extends AppCompatActivity {
     public void onDestroy()
     {
         super.onDestroy();
+        this.timer.cancel();
+
     }
 
 
